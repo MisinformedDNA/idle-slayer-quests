@@ -16,6 +16,12 @@ public class PlayerState
     public List<string> UnlockedFeatures { get; set; } = new();
     public Dictionary<string, int> Statistics { get; set; } = new();
     public PlayerPreferences Preferences { get; set; } = new();
+    
+    // Idle Slayer specific properties
+    public int UltraAscensions { get; set; } = 0;
+    public string CurrentDimension { get; set; } = "Hills";
+    public List<string> UnlockedDimensions { get; set; } = new() { "Hills" };
+    public Dictionary<string, int> EnemyKills { get; set; } = new(); // Track enemy kill counts
 }
 
 public class PlayerPreferences
