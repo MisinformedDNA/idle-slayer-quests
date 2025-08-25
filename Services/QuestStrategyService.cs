@@ -33,6 +33,73 @@ public class QuestStrategyService
     }
     
     /// <summary>
+    /// Gets a recommended order for completing quests, prioritizing efficient progression
+    /// Returns quests in the recommended completion order
+    /// </summary>
+    public List<Quest> GetRecommendedQuestOrder(List<Quest> availableQuests, PlayerState player)
+    {
+        var eligibleQuests = availableQuests
+            .Where(quest => CanPlayerCompleteInTime(quest, player))
+            .ToList();
+            
+        if (!eligibleQuests.Any())
+            return new List<Quest>();
+            
+        // Create ordered list following bundle progression but optimized for efficiency
+        var orderedQuests = new List<Quest>();
+        
+        // Group quests by bundle and order by progression
+        var progressionOrder = new List<string> 
+        { 
+            "Training", "Rookie", "Novice", "Beginner", "Advanced", 
+            "Graduated", "Pro", "Expert", "Master", "Royal", 
+            "Ancient", "Global", "Hard", "Merchant", "Extreme"
+        };
+        
+        foreach (var bundle in progressionOrder)
+        {
+            var bundleQuests = eligibleQuests
+                .Where(q => q.Bundle == bundle)
+                .OrderBy(q => GetCategoryPriority(q.Category, player))
+                .ThenBy(q => q.RecommendedDimension == player.CurrentDimension ? 0 : 1)
+                .ThenByDescending(q => CalculateQuestEfficiency(q, player))
+                .ToList();
+                
+            orderedQuests.AddRange(bundleQuests);
+        }
+        
+        return orderedQuests;
+    }
+    
+    /// <summary>
+    /// Gets wiki-recommended quest order (following official progression)
+    /// </summary>
+    public List<Quest> GetWikiRecommendedOrder(List<Quest> availableQuests, PlayerState player)
+    {
+        var progressionOrder = new List<string> 
+        { 
+            "Training", "Rookie", "Novice", "Beginner", "Advanced", 
+            "Graduated", "Pro", "Expert", "Master", "Royal", 
+            "Ancient", "Global", "Hard", "Merchant", "Extreme"
+        };
+        
+        var orderedQuests = new List<Quest>();
+        
+        foreach (var bundle in progressionOrder)
+        {
+            var bundleQuests = availableQuests
+                .Where(q => q.Bundle == bundle)
+                .Where(q => CanPlayerCompleteInTime(q, player))
+                .OrderBy(q => q.Id) // Original quest order from wiki
+                .ToList();
+                
+            orderedQuests.AddRange(bundleQuests);
+        }
+        
+        return orderedQuests;
+    }
+    
+    /// <summary>
     /// Selects quests following Idle Slayer wiki strategy recommendations
     /// Prioritizes bundle progression and dimension-specific efficiency
     /// </summary>

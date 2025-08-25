@@ -38,7 +38,7 @@ class Program
     
     private static PlayerState CreateEarlyGamePlayer()
     {
-        return new PlayerState 
+        var player = new PlayerState 
         { 
             Level = 15, 
             Coins = 50000, 
@@ -50,11 +50,21 @@ class Program
             UltraAscensions = 0,
             UnlockedFeatures = new() { "Basic Quests" }
         };
+        
+        // Simulate some kill counts to demonstrate quest progress tracking
+        player.EnemyKills = new Dictionary<string, int>
+        {
+            { "flying enemies", 5 },
+            { "wasps", 25 },
+            { "worms", 10 }
+        };
+        
+        return player;
     }
     
     private static PlayerState CreateMidGamePlayer()
     {
-        return new PlayerState 
+        var player = new PlayerState 
         { 
             Level = 45, 
             Coins = 2000000, 
@@ -67,11 +77,22 @@ class Program
             UltraAscensions = 0,
             UnlockedFeatures = new() { "Basic Quests", "Modern City unlocked", "Mystic Valley unlocked" }
         };
+        
+        // Simulate more kill counts for mid-game player
+        player.EnemyKills = new Dictionary<string, int>
+        {
+            { "flying enemies", 200 },
+            { "wasps", 150 },
+            { "worms", 300 },
+            { "jellies", 50 }
+        };
+        
+        return player;
     }
     
     private static PlayerState CreateLateGamePlayer()
     {
-        return new PlayerState 
+        var player = new PlayerState 
         { 
             Level = 80, 
             Coins = 50000000, 
@@ -85,6 +106,18 @@ class Program
             UltraAscensions = 2,
             UnlockedFeatures = new() { "Basic Quests", "Modern City unlocked", "Mystic Valley unlocked", "Advanced Features" }
         };
+        
+        // Simulate extensive kill counts for late-game player
+        player.EnemyKills = new Dictionary<string, int>
+        {
+            { "flying enemies", 1500 },
+            { "wasps", 800 },
+            { "worms", 2500 },
+            { "jellies", 400 },
+            { "demons", 100 }
+        };
+        
+        return player;
     }
     
     private static void TestPlayerProgression(string playerType, PlayerState player, QuestService questService, QuestStrategyService strategyService)
@@ -93,30 +126,27 @@ class Program
         Console.WriteLine($"Level: {player.Level}, Coins: {player.Coins:N0}, Souls: {player.Souls:N0}");
         Console.WriteLine($"Ultra Ascensions: {player.UltraAscensions}, Current Dimension: {player.CurrentDimension}");
         
+        // Show current kill counts
+        Console.WriteLine("Current Kill Counts:");
+        foreach (var killCount in player.EnemyKills.Take(5))
+        {
+            Console.WriteLine($"  - {killCount.Key}: {killCount.Value}");
+        }
+        
         // Get eligible quests for this player
         var eligibleQuests = questService.GetQuestsForPlayer(player);
-        Console.WriteLine($"Eligible Quests: {eligibleQuests.Count}");
+        Console.WriteLine($"\nEligible Quests: {eligibleQuests.Count}");
         
         if (eligibleQuests.Any())
         {
-            // Test wiki-recommended strategy
-            TestStrategy(strategyService, eligibleQuests, player, QuestStrategy.MaxEfficiency, "Wiki-Based Efficiency");
+            // Show recommended quest completion order
+            ShowRecommendedQuestOrder(strategyService, eligibleQuests, player);
             
-            // Show quest details for the top recommendations
-            var recommended = strategyService.SelectWikiRecommendedQuests(eligibleQuests, player);
-            if (recommended.Any())
-            {
-                Console.WriteLine($"\nTop Wiki-Recommended Quests:");
-                foreach (var quest in recommended.Take(3))
-                {
-                    var efficiency = strategyService.CalculateQuestEfficiency(quest, player);
-                    Console.WriteLine($"  - {quest.Name}");
-                    Console.WriteLine($"    Bundle: {quest.Bundle}, Category: {quest.Category}");
-                    Console.WriteLine($"    Objective: {quest.Objective.Description}");
-                    Console.WriteLine($"    Reward: {quest.Rewards.Description}");
-                    Console.WriteLine($"    Dimension: {quest.RecommendedDimension}, Efficiency: {efficiency:F2}");
-                }
-            }
+            // Show wiki-based order for comparison
+            ShowWikiRecommendedOrder(strategyService, eligibleQuests, player);
+            
+            // Demonstrate quest progress tracking
+            DemonstrateQuestProgressTracking(questService, eligibleQuests.First(), player);
         }
         else
         {
@@ -124,24 +154,99 @@ class Program
         }
     }
     
-    private static void TestStrategy(QuestStrategyService strategyService, List<Quest> quests, PlayerState player, QuestStrategy strategy, string displayName = null)
+    private static void ShowRecommendedQuestOrder(QuestStrategyService strategyService, List<Quest> quests, PlayerState player)
     {
-        var strategyName = displayName ?? strategy.ToString();
-        Console.WriteLine($"\n--- {strategyName} Strategy ---");
-        var recommendedQuests = strategyService.SelectOptimalQuests(quests, player, strategy);
+        Console.WriteLine("\n--- RECOMMENDED QUEST COMPLETION ORDER ---");
+        var recommendedOrder = strategyService.GetRecommendedQuestOrder(quests, player);
         
-        if (recommendedQuests.Any())
+        if (recommendedOrder.Any())
         {
-            Console.WriteLine("Top recommended quests:");
-            foreach (var quest in recommendedQuests.Take(3))
+            Console.WriteLine("Complete quests in this order for optimal efficiency:");
+            for (int i = 0; i < Math.Min(5, recommendedOrder.Count); i++)
             {
+                var quest = recommendedOrder[i];
                 var efficiency = strategyService.CalculateQuestEfficiency(quest, player);
-                Console.WriteLine($"  - {quest.Name} (Efficiency: {efficiency:F2}, Bundle: {quest.Bundle})");
+                Console.WriteLine($"  {i + 1}. {quest.Name}");
+                Console.WriteLine($"     Bundle: {quest.Bundle}, Objective: {quest.Objective.Description}");
+                Console.WriteLine($"     Reward: {quest.Rewards.Description}");
+                Console.WriteLine($"     Efficiency Score: {efficiency:F2}");
             }
         }
-        else
+    }
+    
+    private static void ShowWikiRecommendedOrder(QuestStrategyService strategyService, List<Quest> quests, PlayerState player)
+    {
+        Console.WriteLine("\n--- WIKI-BASED QUEST ORDER (for comparison) ---");
+        var wikiOrder = strategyService.GetWikiRecommendedOrder(quests, player);
+        
+        if (wikiOrder.Any())
         {
-            Console.WriteLine("No suitable quests found for this strategy.");
+            Console.WriteLine("Wiki progression order:");
+            for (int i = 0; i < Math.Min(5, wikiOrder.Count); i++)
+            {
+                var quest = wikiOrder[i];
+                Console.WriteLine($"  {i + 1}. {quest.Name} ({quest.Bundle} Bundle)");
+            }
+            
+            // Check for divergences
+            var recommendedOrder = strategyService.GetRecommendedQuestOrder(quests, player);
+            if (recommendedOrder.Any() && wikiOrder.Any())
+            {
+                var firstRecommended = recommendedOrder.First().Name;
+                var firstWiki = wikiOrder.First().Name;
+                if (firstRecommended != firstWiki)
+                {
+                    Console.WriteLine($"🔄 DIVERGENCE: Recommended starts with '{firstRecommended}', Wiki starts with '{firstWiki}'");
+                }
+                else
+                {
+                    Console.WriteLine("✅ Both strategies agree on the first quest");
+                }
+            }
+        }
+    }
+    
+    private static void DemonstrateQuestProgressTracking(QuestService questService, Quest quest, PlayerState player)
+    {
+        Console.WriteLine($"\n--- QUEST PROGRESS TRACKING DEMO ---");
+        Console.WriteLine($"Starting quest: {quest.Name}");
+        Console.WriteLine($"Objective: {quest.Objective.Description}");
+        
+        // Show kill counts before starting quest
+        var targetType = quest.Objective.Target.ToLower();
+        var totalKills = player.EnemyKills.ContainsKey(targetType) ? player.EnemyKills[targetType] : 0;
+        Console.WriteLine($"Total {targetType} killed in game: {totalKills}");
+        
+        // Start the quest
+        questService.StartQuest(player, quest);
+        Console.WriteLine($"✅ Quest activated. Progress will ONLY count kills from this point forward.");
+        
+        // Show initial progress (should be 0 since we just started)
+        var initialProgress = questService.GetQuestProgress(player, quest);
+        Console.WriteLine($"Quest progress: {initialProgress}/{quest.Objective.Count} {quest.Objective.Target}");
+        
+        // Simulate some gameplay kills
+        if (player.EnemyKills.ContainsKey(targetType))
+        {
+            var killsToAdd = Math.Min(quest.Objective.Count + 2, 5); // Add a few kills
+            player.EnemyKills[targetType] += killsToAdd;
+            questService.UpdateQuestProgress(player, quest);
+            
+            var newTotalKills = player.EnemyKills[targetType];
+            var questProgress = questService.GetQuestProgress(player, quest);
+            
+            Console.WriteLine($"🎯 Killed {killsToAdd} more {quest.Objective.Target} during quest");
+            Console.WriteLine($"Total {targetType} killed now: {newTotalKills}");
+            Console.WriteLine($"Quest progress: {questProgress}/{quest.Objective.Count} (only counting kills since quest started)");
+            
+            if (questProgress >= quest.Objective.Count)
+            {
+                Console.WriteLine("🎉 Quest completed!");
+            }
+            else
+            {
+                Console.WriteLine($"Need {quest.Objective.Count - questProgress} more {quest.Objective.Target} to complete");
+            }
         }
     }
 }

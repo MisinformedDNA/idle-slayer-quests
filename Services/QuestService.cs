@@ -21,7 +21,91 @@ public class QuestService
     
     public List<Quest> GetQuestsForPlayer(PlayerState player)
     {
-        return _quests.Where(quest => CanPlayerCompleteQuest(player, quest)).ToList();
+        return _quests.Where(quest => CanPlayerCompleteQuest(player, quest))
+                     .Where(quest => !IsQuestCompleted(player, quest))
+                     .ToList();
+    }
+    
+    public bool IsQuestCompleted(PlayerState player, Quest quest)
+    {
+        return player.QuestProgresses.ContainsKey(quest.Id) && 
+               player.QuestProgresses[quest.Id].Status == QuestStatus.Completed;
+    }
+    
+    public bool IsQuestActive(PlayerState player, Quest quest)
+    {
+        return player.ActiveQuestIds.Contains(quest.Id);
+    }
+    
+    public void StartQuest(PlayerState player, Quest quest)
+    {
+        if (!CanPlayerCompleteQuest(player, quest) || IsQuestCompleted(player, quest))
+            return;
+            
+        // Initialize quest progress
+        var progress = new QuestProgress
+        {
+            QuestId = quest.Id,
+            Status = QuestStatus.Active,
+            StartTime = DateTime.Now,
+            ProgressAtStart = new Dictionary<string, int>(player.EnemyKills) // Snapshot current kill counts
+        };
+        
+        player.QuestProgresses[quest.Id] = progress;
+        if (!player.ActiveQuestIds.Contains(quest.Id))
+        {
+            player.ActiveQuestIds.Add(quest.Id);
+        }
+    }
+    
+    public void UpdateQuestProgress(PlayerState player, Quest quest)
+    {
+        if (!IsQuestActive(player, quest))
+            return;
+            
+        var progress = player.QuestProgresses[quest.Id];
+        
+        // Calculate kills since quest started
+        if (quest.Objective.Type.ToLower() == "kill")
+        {
+            var targetType = quest.Objective.Target.ToLower();
+            var currentKills = player.EnemyKills.ContainsKey(targetType) ? player.EnemyKills[targetType] : 0;
+            var killsAtStart = progress.ProgressAtStart.ContainsKey(targetType) ? progress.ProgressAtStart[targetType] : 0;
+            var killsSinceStart = Math.Max(0, currentKills - killsAtStart);
+            
+            progress.Progress[targetType] = killsSinceStart;
+            
+            // Check if quest is completed
+            if (killsSinceStart >= quest.Objective.Count)
+            {
+                CompleteQuest(player, quest);
+            }
+        }
+    }
+    
+    public void CompleteQuest(PlayerState player, Quest quest)
+    {
+        if (player.QuestProgresses.ContainsKey(quest.Id))
+        {
+            player.QuestProgresses[quest.Id].Status = QuestStatus.Completed;
+            player.QuestProgresses[quest.Id].CompletionTime = DateTime.Now;
+            player.ActiveQuestIds.Remove(quest.Id);
+        }
+    }
+    
+    public int GetQuestProgress(PlayerState player, Quest quest)
+    {
+        if (!player.QuestProgresses.ContainsKey(quest.Id))
+            return 0;
+            
+        var progress = player.QuestProgresses[quest.Id];
+        if (quest.Objective.Type.ToLower() == "kill")
+        {
+            var targetType = quest.Objective.Target.ToLower();
+            return progress.Progress.ContainsKey(targetType) ? progress.Progress[targetType] : 0;
+        }
+        
+        return 0;
     }
     
     public bool CanPlayerCompleteQuest(PlayerState player, Quest quest)

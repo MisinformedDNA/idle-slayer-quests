@@ -21,7 +21,9 @@ public class PlayerState
     public int UltraAscensions { get; set; } = 0;
     public string CurrentDimension { get; set; } = "Hills";
     public List<string> UnlockedDimensions { get; set; } = new() { "Hills" };
-    public Dictionary<string, int> EnemyKills { get; set; } = new(); // Track enemy kill counts
+    public Dictionary<string, int> EnemyKills { get; set; } = new(); // Track total enemy kill counts
+    public Dictionary<int, QuestProgress> QuestProgresses { get; set; } = new(); // Track quest progress by quest ID
+    public List<int> ActiveQuestIds { get; set; } = new(); // Currently active quest IDs
 }
 
 public class PlayerPreferences
